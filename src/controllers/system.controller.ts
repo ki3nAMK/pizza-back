@@ -1,12 +1,6 @@
 import { SYSTEM_PUBLIC_KEY } from '@/constraints/jwt.constraint';
-import {
-  Controller,
-  Get,
-} from '@nestjs/common';
-import {
-  ApiOperation,
-  ApiResponse,
-} from '@nestjs/swagger';
+import { Controller, Get } from '@nestjs/common';
+import { ApiOperation, ApiResponse } from '@nestjs/swagger';
 
 @Controller('system')
 export class SystemController {
@@ -22,6 +16,6 @@ export class SystemController {
     },
   })
   getPublicKey() {
-    return { publicKey: SYSTEM_PUBLIC_KEY };
+    return { data: { publicKey: SYSTEM_PUBLIC_KEY } };
   }
 }

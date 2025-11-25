@@ -1,12 +1,6 @@
 import { NextFunction } from 'express';
-import {
-  get,
-  isNil,
-} from 'lodash';
-import {
-  Server,
-  ServerOptions,
-} from 'socket.io';
+import { get, isNil } from 'lodash';
+import { Server, ServerOptions } from 'socket.io';
 
 import { ErrorDictionary } from '@/enums/error-dictionary.enum';
 import { Role } from '@/enums/role.enum';
@@ -66,6 +60,17 @@ export class RedisIoAdapter extends IoAdapter {
       }
 
       try {
+        const isTokenBlackListed =
+          await sessionService.isTokenBlacklisted(token);
+
+        if (!isNil(isTokenBlackListed)) {
+          next(
+            new UnauthorizedException({
+              statusCode: HttpStatus.UNAUTHORIZED,
+            }),
+          );
+        }
+
         const { sessionId, userId } = await sessionService.verifyToken(
           token,
           SessionType.ACCESS,
@@ -142,6 +147,12 @@ export class RedisIoAdapter extends IoAdapter {
 
     server
       .of(SocketNamespace.SHIPPER)
+      .use(
+        this.createTokenMiddleware(sessionService, usersService, Role.SHIPPER),
+      );
+
+    server
+      .of(SocketNamespace.CLIENT)
       .use(
         this.createTokenMiddleware(sessionService, usersService, Role.SHIPPER),
       );

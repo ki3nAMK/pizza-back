@@ -1,28 +1,63 @@
 import axios from 'axios';
-import { get } from 'lodash';
+import { get, random } from 'lodash';
 
 import {
   OverseaCoordType,
   OverseaNodeCoord,
   OverseaWayType,
 } from '@/interfaces/coordinate.interface';
-import { Coordinate } from '@/models/entities/cart.entity';
-import { Injectable } from '@nestjs/common';
+import { Cart, Coordinate } from '@/models/entities/cart.entity';
+import {
+  BadRequestException,
+  Injectable,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
+import { Server } from 'http';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
+import { ShipperEvent } from '@/enums/shipper-event.enum';
+import { CartRepository } from '@/models/repos/cart.repo';
+import { UsersRepository } from '@/models/repos/user.repo';
+import { Store } from '@/models/entities/store.entity';
+import { MenuRepository } from '@/models/repos/menu.repo';
+import { StoreRepository } from '@/models/repos/store.repo';
+import { SHIPPER_STATUS } from '@/enums/shipper.enum';
+import { CartState } from '@/enums/cart.enum';
 
 @Injectable()
 export class DeliveryService {
-  constructor(private readonly configService: ConfigService) {}
+  private readonly logger = new Logger(DeliveryService.name);
+
+  private shipperLocationsMap: Record<string, Coordinate> = {};
+
+  constructor(
+    private readonly eventEmitter: EventEmitter2,
+    private readonly cartRepo: CartRepository,
+    private readonly userRepo: UsersRepository,
+    private readonly menuRepo: MenuRepository,
+    private readonly storeRepo: StoreRepository,
+  ) {}
 
   async handleCreateLocation(
     userLat: number,
     userLon: number,
+    order: Cart,
   ): Promise<{
     paths: Coordinate[];
     distance: number;
   }> {
-    const shopLat = this.configService.get('store.lat');
-    const shopLon = this.configService.get('store.lon');
+    const menuIds = order.items.map((i) => i.id);
+    const { items: menus } = await this.menuRepo.findAll({
+      _id: { $in: menuIds },
+    });
+    const firstMenu = menus[0];
+    const store = await this.storeRepo.findOneByCondition({
+      menus: firstMenu._id.toString(),
+    });
+
+    const shopLat = store.latitude;
+    const shopLon = store.longitude;
 
     const padding = 0.01; // 1km
     const S = Math.min(shopLat, userLat) - padding;
@@ -39,6 +74,8 @@ export class DeliveryService {
         out body;
         `;
 
+    console.log(body);
+
     try {
       const res = await axios.post(
         'https://overpass-api.de/api/interpreter',
@@ -47,6 +84,8 @@ export class DeliveryService {
           headers: { 'Content-Type': 'text/plain' },
         },
       );
+
+      console.log('Call node and ways success!');
 
       const elements = get(res, 'data.elements', []) as (
         | OverseaNodeCoord
@@ -201,5 +240,146 @@ export class DeliveryService {
       total += this.haversine(p1.lat, p1.lon, p2.lat, p2.lon);
     }
     return total;
+  }
+
+  async requestShipperLocations(orderId: string) {
+    try {
+      const order = await this.cartRepo.findOneByCondition({ _id: orderId });
+      if (!order) {
+        throw new NotFoundException(`Order ${orderId} not found`);
+      }
+
+      const storeCoord = order.deliveryCoord;
+
+      const shippers = await this.userRepo.findAll({
+        role: 'SHIPPER',
+        deleted_at: null,
+        state: { $ne: SHIPPER_STATUS.ENOUGH },
+      });
+
+      const activeShipperIds = shippers.items.map((s) => s._id.toString());
+
+      activeShipperIds.forEach((shipperId: string) => {
+        this.eventEmitter.emit(
+          ShipperEvent.REQUEST_SHIPPER_UPDATE_LOCATION_NEW_ORDER,
+          { shipperId },
+        );
+      });
+
+      await new Promise((resolve) => setTimeout(resolve, 2000));
+
+      const locations = this.shipperLocationsMap;
+
+      activeShipperIds.forEach((shipperId: string) => {
+        if (!locations[shipperId]) {
+          locations[shipperId] = this.mockHanoiCoordinate();
+        }
+      });
+
+      this.logger.log(`Shipper locations for order: ${orderId}`);
+      this.logger.log(locations);
+
+      const { nearestShipperId, distance: distanceFromShipper } =
+        this.findNearestShipper(storeCoord, locations);
+
+      this.logger.warn(
+        `Shipper neareast: ${nearestShipperId} - distance: ${distanceFromShipper / 1000}km to store`,
+      );
+
+      const { paths, distance } = await this.handleCreateLocation(
+        order.latitude,
+        order.longitude,
+        order,
+      );
+
+      if (distance === 0) {
+        throw new BadRequestException('Location not valid!');
+      }
+
+      console.log('paths: ', paths);
+      console.log('distance: ', distance);
+
+      const newOrder = await this.cartRepo.update(order._id.toString(), {
+        paths,
+        distance,
+        deliveryCoord: {
+          lat: locations[nearestShipperId].lat,
+          lon: locations[nearestShipperId].lon,
+        },
+        shipperId: nearestShipperId,
+      });
+
+      const activeOrdersOfShipper = await this.cartRepo.findAll({
+        shipperId: nearestShipperId,
+        state: { $ne: CartState.DONE },
+      });
+
+      const activeOrderCount = activeOrdersOfShipper.items.length;
+
+      this.logger.log(
+        `Shipper ${nearestShipperId} hiện đang giao ${activeOrderCount} đơn hàng`,
+      );
+
+      const shipper = await this.userRepo.findOneByCondition({
+        _id: nearestShipperId,
+      });
+      if (activeOrderCount < 3) {
+        shipper.status = SHIPPER_STATUS.DELIVERING;
+      } else {
+        shipper.status = SHIPPER_STATUS.ENOUGH;
+      }
+
+      await this.userRepo.update(shipper._id.toString(), shipper);
+
+      this.eventEmitter.emit(ShipperEvent.ORDER_DECIDE_SHIPPER, {
+        shipperId: nearestShipperId,
+        order: newOrder,
+      });
+
+      return locations;
+    } catch (err: any) {
+      this.logger.error(err);
+    }
+  }
+
+  private mockHanoiCoordinate(): Coordinate {
+    const lat = random(20.9823939, 21.0354581, true);
+    const lon = random(105.7241221, 105.7962728, true);
+    return { lat, lon };
+  }
+
+  @OnEvent(ShipperEvent.SHIPPER_UPDATE_LOCATION_INTERNAL)
+  handleShipperUpdateLocationInternal(payload: {
+    shipperId: string;
+    location: Coordinate;
+  }) {
+    const { shipperId, location } = payload;
+
+    if (!this.shipperLocationsMap[shipperId]) return;
+
+    this.shipperLocationsMap[shipperId] = location;
+  }
+
+  findNearestShipper(
+    storeCoord: Coordinate,
+    shipperLocations: Record<string, Coordinate>,
+  ) {
+    let nearestShipperId: string | null = null;
+    let minDistance = Infinity;
+
+    for (const [shipperId, loc] of Object.entries(shipperLocations)) {
+      const distance = this.haversine(
+        storeCoord.lat,
+        storeCoord.lon,
+        loc.lat,
+        loc.lon,
+      );
+      if (distance < minDistance) {
+        minDistance = distance;
+        nearestShipperId = shipperId;
+      }
+    }
+
+    return { nearestShipperId, distance: minDistance };
   }
 }

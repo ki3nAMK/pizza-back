@@ -1,20 +1,11 @@
 import { Observable } from 'rxjs';
 
 import { IS_PUBLIC_ROUTE_KEY } from '@/decorators';
-import {
-  ADMIN_VERIFICATION_KEY,
-} from '@/decorators/admin-verification.decorator';
-import {
-  SHIPPER_VERIFICATION_KEY,
-} from '@/decorators/shipper-verification.decorator';
-import {
-  SKIP_VERIFICATION_KEY,
-} from '@/decorators/skip-verification.decorator';
+import { ADMIN_VERIFICATION_KEY } from '@/decorators/admin-verification.decorator';
+import { SHIPPER_VERIFICATION_KEY } from '@/decorators/shipper-verification.decorator';
+import { SKIP_VERIFICATION_KEY } from '@/decorators/skip-verification.decorator';
 import { AppRequest } from '@/interfaces/app-request.interface';
-import {
-  ExecutionContext,
-  Injectable,
-} from '@nestjs/common';
+import { ExecutionContext, Injectable } from '@nestjs/common';
 import { Reflector } from '@nestjs/core';
 import { AuthGuard } from '@nestjs/passport';
 

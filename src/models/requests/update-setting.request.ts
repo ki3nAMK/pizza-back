@@ -1,7 +1,4 @@
-import {
-  IsNumber,
-  Min,
-} from 'class-validator';
+import { IsNumber, Min } from 'class-validator';
 
 import { ApiProperty } from '@nestjs/swagger';
 
@@ -21,6 +18,20 @@ export class UpdateSettingDto {
   @IsNumber()
   @Min(60)
   loginTimeout: number;
+
+  @ApiProperty({
+    example: 3,
+  })
+  @IsNumber()
+  @Min(1)
+  maxResendOtp: number;
+
+  @ApiProperty({
+    example: 300,
+  })
+  @IsNumber()
+  @Min(60)
+  resendOtpTimeout: number;
 
   @ApiProperty({
     description: 'Số ngày hết hạn của Access Token',

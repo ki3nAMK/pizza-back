@@ -2,11 +2,7 @@ import { HydratedDocument } from 'mongoose';
 
 import { BaseEntity } from '@/base/entity.base';
 import { CartState } from '@/enums/cart.enum';
-import {
-  Prop,
-  Schema,
-  SchemaFactory,
-} from '@nestjs/mongoose';
+import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 
 export type CartDocument = HydratedDocument<Cart>;
 
@@ -64,7 +60,7 @@ export class Cart extends BaseEntity {
   @Prop({ type: Coordinate, required: true })
   deliveryCoord: Coordinate;
 
-  @Prop({ required: true })
+  @Prop({ default: 0 })
   distance: number;
 
   @Prop({ required: false, default: null })

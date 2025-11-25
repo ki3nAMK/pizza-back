@@ -4,9 +4,11 @@ export enum ErrorDictionary {
   FORBIDDEN = 'Forbidden',
   BAD_REQUEST = 'BadRequest',
   WEAK_PASSWORD = 'WeakPassword',
+  USER_NOT_FOUND = 'USER_NOT_FOUND',
 
   // * auth
   EMAIL_TAKEN = 'EmailTaken',
+  EMAIL_ALREADY_VERIFIED = 'EMAIL_ALREADY_VERIFIED',
   PASSWORD_NOT_CHANGED = 'PasswordNotChanged',
   EMAIL_OR_PHONE_NOT_VERIFIED = 'EmailOrPhoneNotVerified',
   PASSPHRASE_NOT_EXIST = 'PASSPHRASE_NOT_EXIST',

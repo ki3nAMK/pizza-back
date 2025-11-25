@@ -88,9 +88,17 @@ export interface Configuration {
     url: string;
   };
   store: {
-    lat: number,
-    lon: number
-  }
+    lat: number;
+    lon: number;
+  };
+  aws: {
+    accessKeyId: string;
+    secretAccessKey: string;
+    region: string;
+    ses: {
+      from: string;
+    };
+  };
 }
 
 const redisLockSchema = joi.object({
@@ -140,6 +148,24 @@ const storeSchema = joi.object({
   lon: joi.number().required(),
 });
 
+const awsSchema = joi.object({
+  accessKeyId: joi.string().required(),
+  secretAccessKey: joi.string().required(),
+  region: joi.string().required(),
+  ses: joi
+    .object({
+      from: joi.string().required(),
+    })
+    .required(),
+});
+
+const rabbitmqSchema = joi.object({
+  host: joi.string().required(),
+  port: joi.number().required(),
+  username: joi.string().required(),
+  password: joi.string().required(),
+});
+
 const configSchema = joi.object<Configuration>({
   port: joi.number().required(),
   isProd: joi.boolean().required(),
@@ -154,7 +180,9 @@ const configSchema = joi.object<Configuration>({
   mongo: mongoSchema.required(),
   redisLock: redisLockSchema.required(),
   server: serverSchema.required(),
-  store: storeSchema.required()
+  store: storeSchema.required(),
+  aws: awsSchema.required(),
+  rabbitmq: rabbitmqSchema.required(),
 });
 
 export const loadConfiguration = (): Configuration => {

@@ -3,7 +3,7 @@ services:
     image: mongo:latest
     container_name: pizza-mongodb
     restart: unless-stopped
-    command: [ 'mongod', '--replSet', 'rs0' ]
+    command: ['mongod', '--replSet', 'rs0']
     ports:
       - 27017:27017
     volumes:
@@ -20,6 +20,19 @@ services:
       - 6379:6379
     networks:
       - pizza_network
+
+  pizza-rabbitmq:
+    image: rabbitmq:3-management
+    container_name: pizza-rabbitmq
+    restart: unless-stopped
+    ports:
+      - 5672:5672
+      - 15672:15672
+    volumes:
+      - ./data/rabbitmq:/var/lib/rabbitmq
+    environment:
+      - RABBITMQ_DEFAULT_USER=guest
+      - RABBITMQ_DEFAULT_PASS=guest
 
 networks:
   pizza_network:

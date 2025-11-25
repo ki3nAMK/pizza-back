@@ -1,7 +1,4 @@
-import {
-  addDays,
-  isAfter,
-} from 'date-fns';
+import { addDays, isAfter } from 'date-fns';
 import { Types } from 'mongoose';
 
 import { BaseServiceAbstract } from '@/base/abstract-service.base';
@@ -26,13 +23,14 @@ import {
 } from '@nestjs/common';
 import { ConfigService } from '@nestjs/config';
 import { JwtService } from '@nestjs/jwt';
-
+import Redis from 'ioredis';
 import { CacheDomain } from './cache.service';
 import { SettingsService } from './setting.service';
 
 @Injectable()
 export class SessionService extends BaseServiceAbstract<Session> {
   logger = new Logger(SessionService.name);
+  private client: Redis;
 
   constructor(
     private readonly sessions_repository: SessionsRepository,
@@ -42,6 +40,37 @@ export class SessionService extends BaseServiceAbstract<Session> {
     private readonly settingsService: SettingsService,
   ) {
     super(sessions_repository);
+    this.client = this.cacheDomain.getRedisClient();
+  }
+
+  private readonly BLACKLIST_PREFIX = 'blacklist-token:';
+
+  async storeUserAccessToken(userId: string, newToken: string): Promise<void> {
+    const redisKey = `user:${userId}:access_token`;
+
+    const oldToken = await this.client.get(redisKey);
+    if (oldToken) {
+      await this.addTokenToBlacklist(oldToken);
+    }
+
+    const setting = await this.settingsService.get();
+    const accessTokenExpiresIn = setting.accessTokenExpiresIn;
+
+    const ttl = accessTokenExpiresIn * 24 * 60 * 60;
+
+    await this.client.set(redisKey, newToken, 'EX', ttl);
+  }
+
+  async addTokenToBlacklist(token: string) {
+    const key = this.BLACKLIST_PREFIX + token;
+    const setting = await this.settingsService.get();
+    const accessTokenExpiresIn = setting.accessTokenExpiresIn;
+    const ttl = accessTokenExpiresIn * 24 * 60 * 60;
+    await this.client.set(key, `${ttl}`, 'EX', ttl);
+  }
+
+  async isTokenBlacklisted(token: string): Promise<any> {
+    return await this.client.get(this.BLACKLIST_PREFIX + token);
   }
 
   async gen(userId: string): Promise<{
@@ -82,6 +111,13 @@ export class SessionService extends BaseServiceAbstract<Session> {
       throw new BadRequestException('Invalid userId format');
     }
 
+    const redisKey = `user:${userId}:access_token`;
+
+    const oldToken = await this.client.get(redisKey);
+    if (oldToken) {
+      await this.addTokenToBlacklist(oldToken);
+    }
+
     const promises = [
       this.sessions_repository.create({
         _id: new Types.ObjectId(sessionId),
@@ -105,6 +141,14 @@ export class SessionService extends BaseServiceAbstract<Session> {
       this.cacheDomain
         .getRedisClient()
         .sadd(`${RedisKey.SESSIONS}:userId-${userId}`, sessionId),
+      this.cacheDomain
+        .getRedisClient()
+        .set(
+          redisKey,
+          accessToken,
+          'EX',
+          accessTokenExpiresIn * 24 * 60 * 60 * 1000,
+        ),
     ];
 
     await Promise.all(promises);

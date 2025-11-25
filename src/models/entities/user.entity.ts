@@ -1,5 +1,6 @@
 import { BaseEntity } from '@/base/entity.base';
 import { Role } from '@/enums/role.enum';
+import { SHIPPER_STATUS } from '@/enums/shipper.enum';
 import { Prop, Schema, SchemaFactory } from '@nestjs/mongoose';
 import * as bcrypt from 'bcryptjs';
 import { HydratedDocument } from 'mongoose';
@@ -40,6 +41,12 @@ export class User extends BaseEntity {
 
   @Prop({ enum: Role, default: Role.CLIENT })
   role: Role;
+
+  @Prop({ enum: SHIPPER_STATUS, default: SHIPPER_STATUS.NONE })
+  status: SHIPPER_STATUS;
+
+  @Prop({ default: false })
+  isVerified: boolean;
 
   async comparePassword(password: string): Promise<boolean> {
     return bcrypt.compare(password, this.password);

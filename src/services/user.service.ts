@@ -17,14 +17,26 @@ import { filter, forEach, get, map, omit } from 'lodash';
 import { Model, Schema, Types } from 'mongoose';
 
 @Injectable()
-export class UsersService
-  extends BaseServiceAbstract<User> {
+export class UsersService extends BaseServiceAbstract<User> {
   constructor(
     private readonly users_repository: UsersRepository,
     @InjectModel(User.name)
     private readonly user_model: Model<User>,
   ) {
     super(users_repository);
+  }
+  async markEmailVerified(userId: string): Promise<Partial<User> | null> {
+    return this.user_model
+      .findByIdAndUpdate(
+        userId,
+        { isVerified: true },
+        { new: true, lean: true },
+      )
+      .exec();
+  }
+
+  async getByEmail(email: string): Promise<Partial<User> | null> {
+    return this.user_model.findOne({ email }).lean().exec();
   }
 
   async getById(id: string): Promise<Partial<User> | null> {

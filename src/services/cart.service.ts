@@ -2,10 +2,7 @@ import { BaseServiceAbstract } from '@/base/abstract-service.base';
 // cart.service.ts
 import { CartState } from '@/enums/cart.enum';
 import { ShipperEvent } from '@/enums/shipper-event.enum';
-import {
-  Cart,
-  Coordinate,
-} from '@/models/entities/cart.entity';
+import { Cart, Coordinate } from '@/models/entities/cart.entity';
 import { CartRepository } from '@/models/repos/cart.repo';
 import { MenuRepository } from '@/models/repos/menu.repo';
 import { CreateCartDto } from '@/models/requests/add-to-cart.request';
@@ -19,24 +16,31 @@ import { ConfigService } from '@nestjs/config';
 import { EventEmitter2 } from '@nestjs/event-emitter';
 
 import { DeliveryService } from './delivery.service';
+import { size } from 'lodash';
+import { QueuesService } from './queue.service';
+import { StoreRepository } from '@/models/repos/store.repo';
+import { UsersRepository } from '@/models/repos/user.repo';
+import { SHIPPER_STATUS } from '@/enums/shipper.enum';
 
 @Injectable()
 export class CartService extends BaseServiceAbstract<Cart> {
   constructor(
     private readonly cartRepo: CartRepository,
     private readonly menuRepo: MenuRepository,
-    private readonly deliveryService: DeliveryService,
+    private readonly userRepo: UsersRepository,
     private readonly configService: ConfigService,
     private readonly eventEmitter: EventEmitter2,
+    private readonly queuesService: QueuesService,
+    private readonly storeRepo: StoreRepository,
   ) {
     super(cartRepo);
   }
 
   async getCartByUser(userId: string): Promise<ListResponse<Cart>> {
-    const cart = await this.cartRepo.findOneByCondition({ userId });
+    const { items: carts, count } = await this.cartRepo.findAll({ userId });
     return {
-      count: cart ? 1 : 0,
-      items: cart ? [cart] : [],
+      count,
+      items: carts,
     };
   }
 
@@ -44,14 +48,14 @@ export class CartService extends BaseServiceAbstract<Cart> {
     const shopLat = this.configService.get('store.lat');
     const shopLon = this.configService.get('store.lon');
 
-    const existingActiveCart = await this.cartRepo.findOneByCondition({
+    const activeCarts = await this.cartRepo.findAll({
       userId,
       state: { $ne: CartState.DONE },
     });
 
-    if (existingActiveCart) {
+    if (activeCarts.items.length >= 3) {
       throw new BadRequestException(
-        'Bạn đang có đơn hàng chưa hoàn tất. Hoàn tất đơn hiện tại trước khi tạo đơn mới.',
+        'Bạn chỉ được tạo tối đa 3 đơn hàng chưa hoàn tất cùng lúc.',
       );
     }
 
@@ -84,13 +88,13 @@ export class CartService extends BaseServiceAbstract<Cart> {
 
     const deliveryFee = this.calculateDeliveryFee(dto.latitude, dto.longitude);
 
-    const { paths, distance } = await this.deliveryService.handleCreateLocation(
-      dto.latitude,
-      dto.longitude,
-    );
+    const firstMenu = menus[0];
+    const store = await this.storeRepo.findOneByCondition({
+      menus: firstMenu._id.toString(),
+    });
 
-    if (distance === 0) {
-      throw new BadRequestException('Location not valid!');
+    if (!store) {
+      throw new NotFoundException('Store of menu not found');
     }
 
     const cart = await this.cartRepo.create({
@@ -100,12 +104,16 @@ export class CartService extends BaseServiceAbstract<Cart> {
       deliveryFee,
       latitude: dto.latitude,
       longitude: dto.longitude,
-      paths,
-      distance,
+      // paths,
+      // distance,
       deliveryCoord: {
-        lat: shopLat,
-        lon: shopLon,
+        lat: store.latitude,
+        lon: store.longitude,
       },
+    });
+
+    this.queuesService.sendMessage(QueuesService.NEW_ORDER_NOTIFY, {
+      orderId: cart._id.toString(),
     });
 
     return cart;
@@ -115,11 +123,15 @@ export class CartService extends BaseServiceAbstract<Cart> {
     return 20000;
   }
 
-  async getPendingOrders(page = 1, limit = 20): Promise<ListResponse<Cart>> {
+  async getPendingOrders(
+    userId: string,
+    page = 1,
+    limit = 20,
+  ): Promise<ListResponse<Cart>> {
     const skip = (page - 1) * limit;
 
     const { items, count } = await this.cartRepo.findAll(
-      { shipperId: null, status: CartState.CREATED },
+      { shipperId: userId, state: { $ne: CartState.DONE } },
       { skip, limit, sort: { createdAt: -1 } },
     );
 
@@ -173,6 +185,13 @@ export class CartService extends BaseServiceAbstract<Cart> {
       throw new BadRequestException('Chỉ đơn đang giao mới có thể hoàn tất');
     }
 
+    const shipper = await this.userRepo.findOneByCondition({
+      _id: cart.shipperId,
+    });
+    shipper.status = SHIPPER_STATUS.DELIVERING;
+
+    await this.userRepo.update(cart.shipperId, shipper);
+
     return this.cartRepo.update(cartId, { status: CartState.DONE });
   }
 
@@ -196,7 +215,6 @@ export class CartService extends BaseServiceAbstract<Cart> {
     orderId: string,
     location: Coordinate,
   ) {
-    console.log('orderId: ', orderId);
     const order = await this.findOne(orderId);
 
     if (shipperId !== order.shipperId) {

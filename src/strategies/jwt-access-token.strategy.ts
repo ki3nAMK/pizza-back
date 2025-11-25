@@ -1,7 +1,4 @@
-import {
-  ExtractJwt,
-  Strategy,
-} from 'passport-jwt';
+import { ExtractJwt, Strategy } from 'passport-jwt';
 
 import { ACCESS_TOKEN_PUBLIC_KEY } from '@/constraints/jwt.constraint';
 import { ErrorDictionary } from '@/enums/error-dictionary.enum';
@@ -11,11 +8,9 @@ import { AppRequest } from '@/interfaces/app-request.interface';
 import { TokenPayload } from '@/interfaces/token-payload.interface';
 import { UsersRepository } from '@/models/repos/user.repo';
 import { SessionService } from '@/services/session.service';
-import {
-  ForbiddenException,
-  Injectable,
-} from '@nestjs/common';
+import { ForbiddenException, Injectable } from '@nestjs/common';
 import { PassportStrategy } from '@nestjs/passport';
+import { isNil } from 'lodash';
 
 @Injectable()
 export class JwtAccessTokenStrategy extends PassportStrategy(Strategy) {
@@ -32,6 +27,17 @@ export class JwtAccessTokenStrategy extends PassportStrategy(Strategy) {
   }
 
   async validate(req: AppRequest, { id }: TokenPayload) {
+    const authHeader = req.headers.authorization;
+    const token = authHeader?.replace('Bearer ', '').trim();
+
+    const isTokenBlackListed =
+      await this.sessionService.isTokenBlacklisted(token);
+    if (!isNil(isTokenBlackListed)) {
+      throw new ForbiddenException({
+        code: ErrorDictionary.FORBIDDEN,
+      });
+    }
+
     const { sessionId, userId } = await this.sessionService.verifySession(
       id,
       SessionType.ACCESS,

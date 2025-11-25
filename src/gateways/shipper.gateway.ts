@@ -4,9 +4,9 @@ import { Server } from 'socket.io';
 import { ShipperEvent } from '@/enums/shipper-event.enum';
 import { SocketNamespace } from '@/enums/socket-namespace.enum';
 import { CustomSocket } from '@/interfaces/socket.interface';
-import { Coordinate } from '@/models/entities/cart.entity';
+import { Cart, Coordinate } from '@/models/entities/cart.entity';
 import { CartService } from '@/services/cart.service';
-import { OnEvent } from '@nestjs/event-emitter';
+import { EventEmitter2, OnEvent } from '@nestjs/event-emitter';
 import {
   ConnectedSocket,
   MessageBody,
@@ -29,7 +29,10 @@ import {
 export class ShipperGateway
   implements OnGatewayConnection, OnGatewayDisconnect
 {
-  constructor(private readonly cartService: CartService) {}
+  constructor(
+    private readonly cartService: CartService,
+    private readonly eventEmitter: EventEmitter2,
+  ) {}
 
   @WebSocketServer()
   server: Server;
@@ -50,6 +53,7 @@ export class ShipperGateway
     }
 
     client.join(token);
+    client.join(shipprtId);
   }
 
   async handleDisconnect(client: CustomSocket) {
@@ -100,6 +104,44 @@ export class ShipperGateway
     });
   }
 
+  @OnEvent(ShipperEvent.REQUEST_SHIPPER_UPDATE_LOCATION_NEW_ORDER)
+  handleRequestUpdateShipperLocationNewOrder(payload: { shipperId: string }) {
+    const socketIds = (this.server.sockets as any)?.keys();
+    let thisUserSocket: CustomSocket;
+    for (const socketId of socketIds) {
+      const socket = (this.server.sockets as any)?.get(
+        socketId,
+      ) as CustomSocket;
+
+      if (socket.handshake.currentUserId === payload.shipperId) {
+        thisUserSocket = socket;
+      }
+    }
+
+    this.server.to(payload.shipperId).emit('newOrder', {
+      message: 'OrderAcceptedByShipper',
+    });
+  }
+
+  @OnEvent(ShipperEvent.ORDER_DECIDE_SHIPPER)
+  handleOrderDecideShipper(payload: { shipperId: string; order: Cart }) {
+    const socketIds = (this.server.sockets as any)?.keys();
+    let shipperSocket: CustomSocket;
+    for (const socketId of socketIds) {
+      const socket = (this.server.sockets as any)?.get(
+        socketId,
+      ) as CustomSocket;
+
+      if (socket.handshake.currentUserId === payload.shipperId) {
+        shipperSocket = socket;
+      }
+    }
+
+    this.server.to(payload.shipperId).emit('newOrderRequest', {
+      message: 'NewOrderForYouToDelivery',
+    });
+  }
+
   @SubscribeMessage('shipper-update-location')
   async handleUpdateLocationShipper(
     @MessageBody()
@@ -115,5 +157,21 @@ export class ShipperGateway
       orderId,
       location,
     );
+  }
+
+  @SubscribeMessage('shipper-update-location-new-order')
+  async handleUpdateLocationShipperNewOrder(
+    @MessageBody()
+    data: { location: { lat: number; lon: number } },
+    @ConnectedSocket() client: CustomSocket,
+  ) {
+    const { location } = data;
+    const shipperId = client.handshake.currentUserId;
+
+    // handle logic here
+    this.eventEmitter.emit(ShipperEvent.SHIPPER_UPDATE_LOCATION_INTERNAL, {
+      shipperId,
+      location,
+    });
   }
 }

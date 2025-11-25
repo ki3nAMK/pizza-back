@@ -2,11 +2,7 @@ import { BaseServiceAbstract } from '@/base/abstract-service.base';
 import { Setting } from '@/models/entities/setting.entity';
 import { SettingsRepository } from '@/models/repos/setting.repo';
 import { UpdateSettingDto } from '@/models/requests/update-setting.request';
-import {
-  Injectable,
-  Logger,
-  OnModuleInit,
-} from '@nestjs/common';
+import { Injectable, Logger, OnModuleInit } from '@nestjs/common';
 
 @Injectable()
 export class SettingsService
@@ -28,6 +24,8 @@ export class SettingsService
           loginTimeout: 300,
           accessTokenExpiresIn: 3,
           refreshTokenExpiresIn: 30,
+          maxResendOtp: 3,
+          resendOtpTimeout: 5 * 60,
         };
         await this.settingRepo.create(defaultSetting);
         this.logger.log('Default setting created');

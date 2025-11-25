@@ -14,7 +14,6 @@ export const AVATAR_COLORS = [
 export function getRandomAvatarColor(): string {
   return AVATAR_COLORS[Math.floor(Math.random() * AVATAR_COLORS.length)];
 }
-import { createHash } from 'crypto';
 import { getLinkPreview } from 'link-preview-js';
 import {
   get,
@@ -29,7 +28,6 @@ import {
   reduce,
 } from 'lodash';
 import { Document, Types } from 'mongoose';
-import { v7 } from 'uuid';
 
 export const currentTime = () => new Date();
 
@@ -84,12 +82,6 @@ export interface trimObjectValuesProps {
   exposeEmptyArray?: boolean;
 }
 
-export function generateShortUUID(): string {
-  const uuid = v7();
-  const hash = createHash('sha256').update(uuid).digest('base64');
-  return hash.replace(/[^a-zA-Z0-9]/g, '').substring(0, 24);
-}
-
 export const handleCrawUrl = async (url: string): Promise<any> => {
   let cleanUrl = url;
 
@@ -125,3 +117,9 @@ export const getRandomColor = () => {
 
   return randomColor;
 };
+
+export function genOTP(length = 6): string {
+  return Math.floor(
+    Math.pow(10, length - 1) + Math.random() * 9 * Math.pow(10, length - 1),
+  ).toString();
+}

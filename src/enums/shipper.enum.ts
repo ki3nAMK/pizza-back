@@ -1,0 +1,5 @@
+export enum SHIPPER_STATUS {
+  NONE = 'NONE',
+  DELIVERING = 'DELIVERING',
+  ENOUGH = 'ENOUGH',
+}

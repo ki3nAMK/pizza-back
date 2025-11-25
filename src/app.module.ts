@@ -3,10 +3,7 @@ import { redisStore } from 'cache-manager-ioredis-yet';
 import { HttpModule } from '@nestjs/axios';
 import { CacheModule } from '@nestjs/cache-manager';
 import { Module } from '@nestjs/common';
-import {
-  ConfigModule,
-  ConfigService,
-} from '@nestjs/config';
+import { ConfigModule, ConfigService } from '@nestjs/config';
 import { APP_INTERCEPTOR } from '@nestjs/core';
 import { EventEmitterModule } from '@nestjs/event-emitter';
 import { JwtModule } from '@nestjs/jwt';
@@ -23,17 +20,9 @@ import { MenuController } from './controllers/menu.controller';
 import { SystemController } from './controllers/system.controller';
 import { UserController } from './controllers/user.controller';
 import { ShipperGateway } from './gateways/shipper.gateway';
-import {
-  AppClassSerializerInterceptor,
-} from './interceptors/mongo-class-serializer.interceptor';
-import {
-  Cart,
-  CartSchema,
-} from './models/entities/cart.entity';
-import {
-  Category,
-  CategorySchema,
-} from './models/entities/category.entity';
+import { AppClassSerializerInterceptor } from './interceptors/mongo-class-serializer.interceptor';
+import { Cart, CartSchema } from './models/entities/cart.entity';
+import { Category, CategorySchema } from './models/entities/category.entity';
 import {
   Customization,
   CustomizationSchema,
@@ -42,22 +31,11 @@ import {
   LoginAttempt,
   LoginAttemptSchema,
 } from './models/entities/login-attempt.entity';
-import {
-  Menu,
-  MenuSchema,
-} from './models/entities/menu.entity';
-import {
-  Session,
-  SessionSchema,
-} from './models/entities/session.entity';
-import {
-  Setting,
-  SettingSchema,
-} from './models/entities/setting.entity';
-import {
-  User,
-  UserSchema,
-} from './models/entities/user.entity';
+import { Menu, MenuSchema } from './models/entities/menu.entity';
+import { Session, SessionSchema } from './models/entities/session.entity';
+import { Setting, SettingSchema } from './models/entities/setting.entity';
+import { Store, StoreSchema } from './models/entities/store.entity';
+import { User, UserSchema } from './models/entities/user.entity';
 import { CartRepository } from './models/repos/cart.repo';
 import { CategoriesRepository } from './models/repos/category.repo';
 import { CustomizationRepository } from './models/repos/customization.repo';
@@ -65,6 +43,7 @@ import { LoginAttemptRepository } from './models/repos/login-attempt.entity';
 import { MenuRepository } from './models/repos/menu.repo';
 import { SessionsRepository } from './models/repos/session.repo';
 import { SettingsRepository } from './models/repos/setting.repo';
+import { StoreRepository } from './models/repos/store.repo';
 import { UsersRepository } from './models/repos/user.repo';
 import AppLoggerService from './services/app-logger.service';
 import { AuthService } from './services/auth.service';
@@ -72,14 +51,13 @@ import { CacheDomain } from './services/cache.service';
 import { CartService } from './services/cart.service';
 import { CronService } from './services/cron.service';
 import { DeliveryService } from './services/delivery.service';
+import { CloudMailService } from './services/mail.service';
 import { MenuService } from './services/menu.service';
+import { QueuesService } from './services/queue.service';
 import { SessionService } from './services/session.service';
 import { SettingsService } from './services/setting.service';
 import { UsersService } from './services/user.service';
-import {
-  JwtAccessTokenStrategy,
-  JwtRefreshTokenStrategy,
-} from './strategies';
+import { JwtAccessTokenStrategy, JwtRefreshTokenStrategy } from './strategies';
 
 @Module({
   imports: [
@@ -130,6 +108,10 @@ import {
       {
         name: LoginAttempt.name,
         schema: LoginAttemptSchema,
+      },
+      {
+        name: Store.name,
+        schema: StoreSchema,
       },
     ]),
 
@@ -195,6 +177,8 @@ import {
     DeliveryService,
     CronService,
     SettingsService,
+    CloudMailService,
+    QueuesService,
 
     // * repos
     UsersRepository,
@@ -205,6 +189,7 @@ import {
     CartRepository,
     SettingsRepository,
     LoginAttemptRepository,
+    StoreRepository,
 
     // * Strategy
     JwtAccessTokenStrategy,

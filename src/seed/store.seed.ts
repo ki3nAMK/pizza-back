@@ -1,0 +1,42 @@
+export const stores = [
+  {
+    name: 'Summer Combo Store',
+    address: '123 Sunny Street',
+    image_url: 'https://example.com/store1.png',
+    menus: [], // sẽ được link sau khi seed menu
+    color: '#D33B0D',
+    offer_title: 'SUMMER COMBO',
+    latitude: 20.9823939,
+    longitude: 105.7962728,
+  },
+  {
+    name: 'Burger Bash Hub',
+    address: '456 Grill Avenue',
+    image_url: 'https://example.com/store2.png',
+    menus: [],
+    color: '#DF5A0C',
+    offer_title: 'BURGER BASH',
+    latitude: 20.9828549,
+    longitude: 105.7844143,
+  },
+  {
+    name: 'Pizza Party Place',
+    address: '789 Cheesy Road',
+    image_url: 'https://example.com/store3.png',
+    menus: [],
+    color: '#084137',
+    offer_title: 'PIZZA PARTY',
+    latitude: 20.993848945071232,
+    longitude: 105.80661304201938,
+  },
+  {
+    name: 'Burrito Delight Spot',
+    address: '101 Taco Lane',
+    image_url: 'https://example.com/store4.png',
+    menus: [],
+    color: '#EB920C',
+    offer_title: 'BURRITO DELIGHT',
+    latitude: 20.980666477346674,
+    longitude: 105.80290373415261,
+  },
+];

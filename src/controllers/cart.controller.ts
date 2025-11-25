@@ -1,10 +1,5 @@
-import {
-  CurrentUserId,
-  SkipVerification,
-} from '@/decorators';
-import {
-  ShipperVerification,
-} from '@/decorators/shipper-verification.decorator';
+import { CurrentUserId, SkipVerification } from '@/decorators';
+import { ShipperVerification } from '@/decorators/shipper-verification.decorator';
 import { SessionType } from '@/enums/session-type.enum';
 import { JwtAccessTokenGuard } from '@/guards';
 import { Cart } from '@/models/entities/cart.entity';
@@ -126,10 +121,15 @@ export class CartController {
   })
   @ShipperVerification()
   async getPendingOrders(
+    @CurrentUserId() userId: string,
     @Query('page') page = 1,
     @Query('limit') limit = 20,
   ): Promise<ListResponse<Cart>> {
-    const result = await this.cartService.getPendingOrders(+page, +limit);
+    const result = await this.cartService.getPendingOrders(
+      userId,
+      +page,
+      +limit,
+    );
 
     return result;
   }
