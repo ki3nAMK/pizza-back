@@ -58,6 +58,7 @@ import { SessionService } from './services/session.service';
 import { SettingsService } from './services/setting.service';
 import { UsersService } from './services/user.service';
 import { JwtAccessTokenStrategy, JwtRefreshTokenStrategy } from './strategies';
+import { SeedService } from './services/seed.service';
 
 @Module({
   imports: [
@@ -171,7 +172,7 @@ import { JwtAccessTokenStrategy, JwtRefreshTokenStrategy } from './strategies';
     SessionService,
     AuthService,
     UsersService,
-    // SeedService,
+    SeedService,
     MenuService,
     CartService,
     DeliveryService,
